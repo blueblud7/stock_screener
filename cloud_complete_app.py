@@ -26,39 +26,93 @@ def load_complete_stock_lists():
     # GitHub에서 JSON 파일 읽기 시도
     json_file = "complete_stock_lists.json"
     
-    # 파일 존재 여부 확인
-    if not os.path.exists(json_file):
-        st.error(f"❌ {json_file} 파일을 찾을 수 없습니다!")
-        st.info("📂 현재 디렉토리 파일 목록:")
+    # 상세한 파일 시스템 디버깅
+    st.subheader("🔍 파일 시스템 디버깅")
+    
+    # 현재 작업 디렉토리 확인
+    current_dir = os.getcwd()
+    st.write(f"📂 현재 작업 디렉토리: {current_dir}")
+    
+    # 디렉토리 내 모든 파일 목록
+    try:
+        all_files = os.listdir('.')
+        st.write(f"📄 전체 파일 목록: {all_files}")
+        
+        json_files = [f for f in all_files if f.endswith('.json')]
+        st.write(f"📊 JSON 파일들: {json_files}")
+    except Exception as e:
+        st.error(f"디렉토리 읽기 실패: {str(e)}")
+    
+    # 파일 존재 여부 및 상세 정보
+    file_exists = os.path.exists(json_file)
+    st.write(f"📁 {json_file} 존재 여부: {file_exists}")
+    
+    if file_exists:
         try:
-            files = [f for f in os.listdir('.') if f.endswith('.json')]
-            st.write(files)
-        except:
-            st.write("디렉토리 읽기 실패")
+            file_size = os.path.getsize(json_file)
+            st.write(f"📏 파일 크기: {file_size:,} bytes")
+            
+            # 파일 읽기 권한 확인
+            readable = os.access(json_file, os.R_OK)
+            st.write(f"📖 읽기 권한: {readable}")
+            
+        except Exception as e:
+            st.error(f"파일 정보 확인 실패: {str(e)}")
+    
+    # 파일 존재 여부 확인
+    if not file_exists:
+        st.error(f"❌ {json_file} 파일을 찾을 수 없습니다!")
         
         # 기본 샘플 데이터 사용
         st.warning("⚠️ 기본 샘플 종목 리스트를 사용합니다.")
         return get_fallback_stock_lists()
     
+    # 파일 로딩 시도
+    st.info(f"🔄 {json_file} 파일 로딩 중...")
+    
     try:
         with open(json_file, 'r', encoding='utf-8') as f:
+            st.write("📖 파일 열기 성공")
+            
+            # 파일 일부 미리보기
+            f.seek(0)
+            preview = f.read(200)
+            st.write(f"📄 파일 미리보기 (첫 200자): {preview}...")
+            
+            # 파일 전체 읽기
+            f.seek(0)
             stock_lists = json.load(f)
+            st.write("✅ JSON 파싱 성공")
         
         # 데이터 유효성 검사
-        if isinstance(stock_lists, dict) and all(isinstance(v, dict) for v in stock_lists.values()):
-            total_stocks = sum(len(stocks) for stocks in stock_lists.values())
-            st.success(f"✅ 완전한 종목 리스트 로딩 완료! (총 {total_stocks}개 종목)")
+        st.write(f"📊 로드된 데이터 타입: {type(stock_lists)}")
+        
+        if isinstance(stock_lists, dict):
+            st.write(f"📈 시장 개수: {len(stock_lists)}")
+            st.write(f"🏢 시장 목록: {list(stock_lists.keys())}")
             
-            # 각 시장별 종목 수 표시
-            st.info("📊 시장별 종목 수:")
-            for market, stocks in stock_lists.items():
-                st.write(f"- {market}: {len(stocks)}개")
-            
-            return stock_lists
+            if all(isinstance(v, dict) for v in stock_lists.values()):
+                total_stocks = sum(len(stocks) for stocks in stock_lists.values())
+                st.success(f"✅ 완전한 종목 리스트 로딩 완료! (총 {total_stocks}개 종목)")
+                
+                # 각 시장별 종목 수 표시
+                st.info("📊 시장별 종목 수:")
+                for market, stocks in stock_lists.items():
+                    st.write(f"- {market}: {len(stocks)}개")
+                
+                return stock_lists
+            else:
+                st.error("❌ 시장 데이터가 딕셔너리 형태가 아닙니다.")
         else:
-            st.warning("⚠️ JSON 파일 형식이 올바르지 않습니다.")
+            st.error(f"❌ 루트 데이터가 딕셔너리가 아닙니다: {type(stock_lists)}")
+    
+    except json.JSONDecodeError as e:
+        st.error(f"❌ JSON 파싱 오류: {str(e)}")
+    except UnicodeDecodeError as e:
+        st.error(f"❌ 인코딩 오류: {str(e)}")
     except Exception as e:
-        st.error(f"JSON 파일 로딩 실패: {str(e)}")
+        st.error(f"❌ 파일 로딩 실패: {str(e)}")
+        st.error(f"오류 타입: {type(e).__name__}")
     
     # 실패 시 기본 데이터 사용
     st.warning("⚠️ 기본 샘플 종목 리스트를 사용합니다.")
