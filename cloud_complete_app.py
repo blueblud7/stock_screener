@@ -207,24 +207,46 @@ def check_volume_surge(df, multiplier=1.5):
 def screen_stocks_batch(stocks, conditions, batch_size=20):
     """배치 단위로 메모리 효율적 스크리닝"""
     
-    # 입력 유효성 검사
+    # 상세한 디버깅 정보
+    st.info(f"🔍 **DEBUG**: stocks 타입: {type(stocks)}, 길이: {len(stocks) if hasattr(stocks, '__len__') else 'N/A'}")
+    
+    # 더 엄격한 입력 유효성 검사
+    if stocks is None:
+        st.error("❌ 종목 데이터가 None입니다.")
+        return []
+    
     if not isinstance(stocks, dict):
-        st.error(f"❌ 종목 데이터 오류: 예상된 딕셔너리가 아닙니다. 실제 타입: {type(stocks)}")
+        st.error(f"❌ 종목 데이터 타입 오류: {type(stocks).__name__} (예상: dict)")
+        st.error(f"실제 데이터: {str(stocks)[:200]}...")
         return []
     
     if not stocks:
         st.warning("⚠️ 선택된 시장에 종목이 없습니다.")
         return []
     
+    # hasattr으로 안전하게 확인
+    if not hasattr(stocks, 'items'):
+        st.error(f"❌ stocks 객체에 items() 메소드가 없습니다. 타입: {type(stocks)}")
+        return []
+    
     results = []
     total_stocks = len(stocks)
     processed = 0
+    
+    st.info(f"📊 총 {total_stocks}개 종목 스크리닝 시작...")
     
     progress_bar = st.progress(0)
     status_text = st.empty()
     
     try:
-        stock_items = list(stocks.items())
+        # 더 안전한 items() 호출
+        try:
+            stock_items = list(stocks.items())
+            st.success(f"✅ 종목 리스트 변환 성공: {len(stock_items)}개")
+        except Exception as items_error:
+            st.error(f"❌ stocks.items() 호출 실패: {str(items_error)}")
+            st.error(f"stocks 내용 샘플: {list(stocks.keys())[:5] if hasattr(stocks, 'keys') else 'N/A'}")
+            return []
         
         # 배치 단위로 처리
         for i in range(0, total_stocks, batch_size):
@@ -274,7 +296,7 @@ def screen_stocks_batch(stocks, conditions, batch_size=20):
                             "Conditions": ", ".join(conditions_met)
                         })
                         
-                except Exception as e:
+                except Exception as stock_error:
                     # 개별 종목 에러는 무시하고 계속 진행
                     continue
             
@@ -282,7 +304,10 @@ def screen_stocks_batch(stocks, conditions, batch_size=20):
             time.sleep(0.1)
     
     except Exception as e:
-        st.error(f"❌ 스크리닝 중 오류 발생: {str(e)}")
+        st.error(f"❌ 스크리닝 중 전체 오류 발생: {str(e)}")
+        st.error(f"에러 타입: {type(e).__name__}")
+        import traceback
+        st.error(f"상세 에러: {traceback.format_exc()}")
         return []
     
     finally:
@@ -348,10 +373,19 @@ def main():
     with st.spinner("종목 리스트 로딩 중..."):
         stock_lists = load_complete_stock_lists()
     
-    # 데이터 유효성 재확인
-    if not isinstance(stock_lists, dict) or not stock_lists:
+    # 더 상세한 데이터 유효성 검사
+    st.sidebar.markdown("### 🔍 시스템 상태")
+    if not isinstance(stock_lists, dict):
+        st.sidebar.error(f"❌ 로드된 데이터 타입: {type(stock_lists)}")
         st.error("❌ 종목 리스트 로딩에 실패했습니다. 페이지를 새로고침해주세요.")
         st.stop()
+    
+    if not stock_lists:
+        st.sidebar.error("❌ 빈 종목 리스트")
+        st.error("❌ 종목 리스트가 비어있습니다. 페이지를 새로고침해주세요.")
+        st.stop()
+    
+    st.sidebar.success("✅ 종목 리스트 정상 로드")
     
     # 시장 선택
     market = st.sidebar.selectbox(
@@ -360,21 +394,33 @@ def main():
         index=0
     )
     
-    # 선택된 시장의 종목 가져오기
-    selected_stocks = stock_lists.get(market, {})
+    # 선택된 시장의 종목 가져오기 (더 안전하게)
+    try:
+        selected_stocks = stock_lists.get(market, {})
+        st.sidebar.info(f"✅ {market} 데이터 타입: {type(selected_stocks)}")
+    except Exception as e:
+        st.sidebar.error(f"❌ 시장 데이터 로드 실패: {str(e)}")
+        st.error(f"❌ {market} 시장 데이터를 가져올 수 없습니다.")
+        st.stop()
     
     if not selected_stocks:
         st.error(f"❌ {market} 시장에 종목이 없습니다.")
         st.stop()
     
+    if not isinstance(selected_stocks, dict):
+        st.error(f"❌ {market} 시장 데이터 타입 오류: {type(selected_stocks)}")
+        st.stop()
+    
     st.sidebar.write(f"선택된 시장: **{market}** ({len(selected_stocks)}개 종목)")
     
-    # 디버깅 정보 (개발 시에만 표시)
-    with st.sidebar.expander("🔍 디버그 정보", expanded=False):
-        st.write(f"종목 리스트 타입: {type(selected_stocks)}")
-        st.write(f"종목 수: {len(selected_stocks) if isinstance(selected_stocks, dict) else 'N/A'}")
+    # 디버깅 정보 (항상 표시)
+    with st.sidebar.expander("🔍 디버그 정보", expanded=True):
+        st.write(f"**종목 리스트 타입**: {type(selected_stocks)}")
+        st.write(f"**종목 수**: {len(selected_stocks) if isinstance(selected_stocks, dict) else 'N/A'}")
+        st.write(f"**hasattr items**: {hasattr(selected_stocks, 'items')}")
         if isinstance(selected_stocks, dict) and selected_stocks:
-            st.write(f"첫 번째 종목: {list(selected_stocks.items())[0]}")
+            first_item = list(selected_stocks.items())[0]
+            st.write(f"**첫 번째 종목**: {first_item}")
     
     # 조건 설정
     st.sidebar.subheader("🎯 스크리닝 조건")
