@@ -30,13 +30,18 @@ def load_complete_stock_lists():
         try:
             with open(json_file, 'r', encoding='utf-8') as f:
                 stock_lists = json.load(f)
-            st.success(f"✅ 완전한 종목 리스트 로딩 완료! (총 {sum(len(stocks) for stocks in stock_lists.values())}개 종목)")
-            return stock_lists
+            
+            # 데이터 유효성 검사
+            if isinstance(stock_lists, dict) and all(isinstance(v, dict) for v in stock_lists.values()):
+                st.success(f"✅ 완전한 종목 리스트 로딩 완료! (총 {sum(len(stocks) for stocks in stock_lists.values())}개 종목)")
+                return stock_lists
+            else:
+                st.warning("⚠️ JSON 파일 형식이 올바르지 않습니다.")
         except Exception as e:
             st.warning(f"JSON 파일 로딩 실패: {str(e)}")
     
-    # 파일이 없으면 기본 주요 종목 사용
-    st.warning("⚠️ 완전한 종목 리스트를 찾을 수 없어 주요 종목으로 대체합니다.")
+    # 파일이 없거나 로딩 실패 시 기본 종목 사용
+    st.info("ℹ️ 기본 주요 종목 리스트를 사용합니다.")
     
     return {
         "S&P 500": {
@@ -201,6 +206,16 @@ def check_volume_surge(df, multiplier=1.5):
 # 배치 스크리닝 (메모리 효율적)
 def screen_stocks_batch(stocks, conditions, batch_size=20):
     """배치 단위로 메모리 효율적 스크리닝"""
+    
+    # 입력 유효성 검사
+    if not isinstance(stocks, dict):
+        st.error(f"❌ 종목 데이터 오류: 예상된 딕셔너리가 아닙니다. 실제 타입: {type(stocks)}")
+        return []
+    
+    if not stocks:
+        st.warning("⚠️ 선택된 시장에 종목이 없습니다.")
+        return []
+    
     results = []
     total_stocks = len(stocks)
     processed = 0
@@ -208,64 +223,72 @@ def screen_stocks_batch(stocks, conditions, batch_size=20):
     progress_bar = st.progress(0)
     status_text = st.empty()
     
-    stock_items = list(stocks.items())
-    
-    # 배치 단위로 처리
-    for i in range(0, total_stocks, batch_size):
-        batch = stock_items[i:i+batch_size]
+    try:
+        stock_items = list(stocks.items())
         
-        for symbol, name in batch:
-            processed += 1
-            progress = processed / total_stocks
-            progress_bar.progress(progress)
-            status_text.text(f"분석 중: {name} ({symbol}) - {processed}/{total_stocks}")
+        # 배치 단위로 처리
+        for i in range(0, total_stocks, batch_size):
+            batch = stock_items[i:i+batch_size]
             
-            try:
-                df = get_stock_data_optimized(symbol)
-                if df is None or len(df) < 20:
+            for symbol, name in batch:
+                processed += 1
+                progress = processed / total_stocks
+                progress_bar.progress(progress)
+                status_text.text(f"분석 중: {name} ({symbol}) - {processed}/{total_stocks}")
+                
+                try:
+                    df = get_stock_data_optimized(symbol)
+                    if df is None or len(df) < 20:
+                        continue
+                    
+                    # 조건 확인
+                    conditions_met = []
+                    
+                    # BB 상단 돌파
+                    if conditions.get("bb_breakout") and check_bb_breakout(df):
+                        conditions_met.append("BB상단돌파")
+                    
+                    # RSI 조건
+                    if "rsi_condition" in conditions:
+                        rsi_cond = conditions["rsi_condition"]
+                        if check_rsi_condition(df, rsi_cond["type"], rsi_cond["value"]):
+                            conditions_met.append(f"RSI{rsi_cond['type']}{rsi_cond['value']}")
+                    
+                    # 거래량 조건
+                    if "volume_surge" in conditions:
+                        if check_volume_surge(df, conditions["volume_surge"]):
+                            conditions_met.append("거래량급증")
+                    
+                    # 결과 추가
+                    if conditions_met:
+                        latest = df.iloc[-1]
+                        change_pct = ((latest['Close'] - df.iloc[-2]['Close']) / df.iloc[-2]['Close'] * 100) if len(df) > 1 else 0
+                        
+                        results.append({
+                            "Symbol": symbol,
+                            "Name": name,
+                            "Price": round(latest['Close'], 2),
+                            "Change%": round(change_pct, 2),
+                            "RSI": round(latest['RSI'], 1) if not pd.isna(latest['RSI']) else 0,
+                            "Volume_Ratio": round(latest['Volume'] / latest['Volume_MA'], 2) if latest['Volume_MA'] > 0 else 0,
+                            "Conditions": ", ".join(conditions_met)
+                        })
+                        
+                except Exception as e:
+                    # 개별 종목 에러는 무시하고 계속 진행
                     continue
-                
-                # 조건 확인
-                conditions_met = []
-                
-                # BB 상단 돌파
-                if conditions.get("bb_breakout") and check_bb_breakout(df):
-                    conditions_met.append("BB상단돌파")
-                
-                # RSI 조건
-                if "rsi_condition" in conditions:
-                    rsi_cond = conditions["rsi_condition"]
-                    if check_rsi_condition(df, rsi_cond["type"], rsi_cond["value"]):
-                        conditions_met.append(f"RSI{rsi_cond['type']}{rsi_cond['value']}")
-                
-                # 거래량 조건
-                if "volume_surge" in conditions:
-                    if check_volume_surge(df, conditions["volume_surge"]):
-                        conditions_met.append("거래량급증")
-                
-                # 결과 추가
-                if conditions_met:
-                    latest = df.iloc[-1]
-                    change_pct = ((latest['Close'] - df.iloc[-2]['Close']) / df.iloc[-2]['Close'] * 100) if len(df) > 1 else 0
-                    
-                    results.append({
-                        "Symbol": symbol,
-                        "Name": name,
-                        "Price": round(latest['Close'], 2),
-                        "Change%": round(change_pct, 2),
-                        "RSI": round(latest['RSI'], 1) if not pd.isna(latest['RSI']) else 0,
-                        "Volume_Ratio": round(latest['Volume'] / latest['Volume_MA'], 2) if latest['Volume_MA'] > 0 else 0,
-                        "Conditions": ", ".join(conditions_met)
-                    })
-                    
-            except Exception as e:
-                continue
-        
-        # 배치 완료 후 잠시 대기 (메모리 정리)
-        time.sleep(0.1)
+            
+            # 배치 완료 후 잠시 대기 (메모리 정리)
+            time.sleep(0.1)
     
-    progress_bar.empty()
-    status_text.empty()
+    except Exception as e:
+        st.error(f"❌ 스크리닝 중 오류 발생: {str(e)}")
+        return []
+    
+    finally:
+        progress_bar.empty()
+        status_text.empty()
+    
     return results
 
 # 간단한 차트 생성
@@ -325,6 +348,11 @@ def main():
     with st.spinner("종목 리스트 로딩 중..."):
         stock_lists = load_complete_stock_lists()
     
+    # 데이터 유효성 재확인
+    if not isinstance(stock_lists, dict) or not stock_lists:
+        st.error("❌ 종목 리스트 로딩에 실패했습니다. 페이지를 새로고침해주세요.")
+        st.stop()
+    
     # 시장 선택
     market = st.sidebar.selectbox(
         "📈 시장 선택",
@@ -332,8 +360,21 @@ def main():
         index=0
     )
     
-    selected_stocks = stock_lists[market]
+    # 선택된 시장의 종목 가져오기
+    selected_stocks = stock_lists.get(market, {})
+    
+    if not selected_stocks:
+        st.error(f"❌ {market} 시장에 종목이 없습니다.")
+        st.stop()
+    
     st.sidebar.write(f"선택된 시장: **{market}** ({len(selected_stocks)}개 종목)")
+    
+    # 디버깅 정보 (개발 시에만 표시)
+    with st.sidebar.expander("🔍 디버그 정보", expanded=False):
+        st.write(f"종목 리스트 타입: {type(selected_stocks)}")
+        st.write(f"종목 수: {len(selected_stocks) if isinstance(selected_stocks, dict) else 'N/A'}")
+        if isinstance(selected_stocks, dict) and selected_stocks:
+            st.write(f"첫 번째 종목: {list(selected_stocks.items())[0]}")
     
     # 조건 설정
     st.sidebar.subheader("🎯 스크리닝 조건")
