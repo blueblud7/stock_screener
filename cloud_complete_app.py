@@ -26,23 +26,46 @@ def load_complete_stock_lists():
     # GitHub에서 JSON 파일 읽기 시도
     json_file = "complete_stock_lists.json"
     
-    if os.path.exists(json_file):
+    # 파일 존재 여부 확인
+    if not os.path.exists(json_file):
+        st.error(f"❌ {json_file} 파일을 찾을 수 없습니다!")
+        st.info("📂 현재 디렉토리 파일 목록:")
         try:
-            with open(json_file, 'r', encoding='utf-8') as f:
-                stock_lists = json.load(f)
+            files = [f for f in os.listdir('.') if f.endswith('.json')]
+            st.write(files)
+        except:
+            st.write("디렉토리 읽기 실패")
+        
+        # 기본 샘플 데이터 사용
+        st.warning("⚠️ 기본 샘플 종목 리스트를 사용합니다.")
+        return get_fallback_stock_lists()
+    
+    try:
+        with open(json_file, 'r', encoding='utf-8') as f:
+            stock_lists = json.load(f)
+        
+        # 데이터 유효성 검사
+        if isinstance(stock_lists, dict) and all(isinstance(v, dict) for v in stock_lists.values()):
+            total_stocks = sum(len(stocks) for stocks in stock_lists.values())
+            st.success(f"✅ 완전한 종목 리스트 로딩 완료! (총 {total_stocks}개 종목)")
             
-            # 데이터 유효성 검사
-            if isinstance(stock_lists, dict) and all(isinstance(v, dict) for v in stock_lists.values()):
-                st.success(f"✅ 완전한 종목 리스트 로딩 완료! (총 {sum(len(stocks) for stocks in stock_lists.values())}개 종목)")
-                return stock_lists
-            else:
-                st.warning("⚠️ JSON 파일 형식이 올바르지 않습니다.")
-        except Exception as e:
-            st.warning(f"JSON 파일 로딩 실패: {str(e)}")
+            # 각 시장별 종목 수 표시
+            st.info("📊 시장별 종목 수:")
+            for market, stocks in stock_lists.items():
+                st.write(f"- {market}: {len(stocks)}개")
+            
+            return stock_lists
+        else:
+            st.warning("⚠️ JSON 파일 형식이 올바르지 않습니다.")
+    except Exception as e:
+        st.error(f"JSON 파일 로딩 실패: {str(e)}")
     
-    # 파일이 없거나 로딩 실패 시 기본 종목 사용
-    st.info("ℹ️ 기본 주요 종목 리스트를 사용합니다.")
-    
+    # 실패 시 기본 데이터 사용
+    st.warning("⚠️ 기본 샘플 종목 리스트를 사용합니다.")
+    return get_fallback_stock_lists()
+
+def get_fallback_stock_lists():
+    """기본 샘플 종목 리스트 (완전한 버전이 로드되지 않을 때)"""
     return {
         "S&P 500": {
             "AAPL": "Apple Inc.", "MSFT": "Microsoft Corp.", "GOOGL": "Alphabet Inc.",
@@ -363,7 +386,17 @@ def create_simple_chart(symbol, df):
 # 메인 앱
 def main():
     st.title("🚀 주식 기술적 분석 스크리너 (Complete Cloud Edition)")
-    st.markdown("**완전한 버전 - 최대 851개 종목 지원**")
+    st.markdown("**완전한 버전 - 최대 851개 종목 지원 (Streamlit Cloud)**")
+    
+    # 중요 공지
+    st.markdown("""
+    <div style="background-color: #e6f3ff; padding: 10px; border-radius: 5px; border-left: 5px solid #0066cc;">
+    <strong>📢 중요:</strong> 이 앱은 <strong>851개 전체 종목</strong>을 지원합니다!<br>
+    • S&P 500: 503개 | NASDAQ: 154개 | KOSPI: 110개 | KOSDAQ: 84개<br>
+    • complete_stock_lists.json 파일이 정상 로드되면 전체 종목을 사용할 수 있습니다.
+    </div>
+    """, unsafe_allow_html=True)
+    
     st.markdown("---")
     
     # 사이드바
