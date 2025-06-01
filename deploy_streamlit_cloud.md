@@ -14,7 +14,7 @@
 1. "New app" 클릭
 2. Repository: `blueblud7/stock_screener`
 3. Branch: `master`
-4. Main file path: `complete_app.py`
+4. **Main file path: `complete_app.py`** ⭐ (완전한 851개 종목 버전)
 5. App URL: 원하는 주소 설정 (예: `stock-screener-complete`)
 
 ### 3. 배포 완료
@@ -23,15 +23,14 @@
 
 ## ⚠️ 주의사항
 
-### 종목 리스트 파일 문제 해결
-현재 `complete_stock_lists.json` 파일이 너무 크기 때문에 Streamlit Cloud에서 문제가 될 수 있습니다.
+### 완전한 버전 사용
+- **complete_app.py**: 851개 종목 지원 (S&P 500: 503개, NASDAQ: 154개, KOSPI: 110개, KOSDAQ: 84개)
+- **cloud_app.py**: 테스트 버전 (각 시장별 15-20개 종목)
 
-**해결책**: `complete_app.py`를 수정하여 실행 시 종목 리스트를 자동 생성하도록 변경
-
-### 메모리 제한
-- Streamlit Cloud는 메모리 제한이 있음
-- 851개 종목 전체 분석 시 메모리 부족 가능
-- 샘플 데이터 버전(`improved_app.py`) 사용 권장
+### 메모리 최적화
+- 첫 실행 시 `complete_stock_lists.json` 자동 로딩
+- 캐싱으로 메모리 사용량 최소화
+- 배치 처리로 안정성 확보
 
 ## 🌐 배포 후 접속
 - 전 세계 어디서나 접속 가능
