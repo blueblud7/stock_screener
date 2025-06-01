@@ -19,9 +19,14 @@ st.set_page_config(
 )
 
 # 메모리 최적화된 종목 리스트 로딩
-@st.cache_data(ttl=3600)
+@st.cache_data(ttl=300, show_spinner=False)  # 캐시 시간 단축
 def load_complete_stock_lists():
     """완전한 종목 리스트를 로드합니다."""
+    
+    # 강제 캐시 클리어 체크
+    if st.sidebar.button("🔄 캐시 클리어 & 새로고침"):
+        st.cache_data.clear()
+        st.rerun()
     
     # GitHub에서 JSON 파일 읽기 시도
     json_file = "complete_stock_lists.json"
@@ -56,6 +61,12 @@ def load_complete_stock_lists():
             readable = os.access(json_file, os.R_OK)
             st.write(f"📖 읽기 권한: {readable}")
             
+            # 파일 수정 시간
+            import datetime
+            mtime = os.path.getmtime(json_file)
+            mtime_str = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
+            st.write(f"🕒 파일 수정 시간: {mtime_str}")
+            
         except Exception as e:
             st.error(f"파일 정보 확인 실패: {str(e)}")
     
@@ -77,9 +88,15 @@ def load_complete_stock_lists():
             # 파일 일부 미리보기
             f.seek(0)
             preview = f.read(200)
-            st.write(f"📄 파일 미리보기 (첫 200자): {preview}...")
+            st.write(f"📄 파일 미리보기 (첫 200자):")
+            st.code(preview)
             
             # 파일 전체 읽기
+            f.seek(0)
+            content = f.read()
+            st.write(f"📐 전체 파일 크기: {len(content)} 문자")
+            
+            # JSON 파싱
             f.seek(0)
             stock_lists = json.load(f)
             st.write("✅ JSON 파싱 성공")
@@ -91,6 +108,16 @@ def load_complete_stock_lists():
             st.write(f"📈 시장 개수: {len(stock_lists)}")
             st.write(f"🏢 시장 목록: {list(stock_lists.keys())}")
             
+            # 각 시장별 종목 수 미리보기
+            for market, stocks in stock_lists.items():
+                if isinstance(stocks, dict):
+                    st.write(f"🔍 {market}: {len(stocks)}개 종목")
+                    # 첫 3개 종목 예시
+                    sample_stocks = list(stocks.items())[:3]
+                    st.write(f"   예시: {sample_stocks}")
+                else:
+                    st.error(f"❌ {market} 데이터가 딕셔너리가 아님: {type(stocks)}")
+            
             if all(isinstance(v, dict) for v in stock_lists.values()):
                 total_stocks = sum(len(stocks) for stocks in stock_lists.values())
                 st.success(f"✅ 완전한 종목 리스트 로딩 완료! (총 {total_stocks}개 종목)")
@@ -100,19 +127,25 @@ def load_complete_stock_lists():
                 for market, stocks in stock_lists.items():
                     st.write(f"- {market}: {len(stocks)}개")
                 
+                # 캐시 정보 표시
+                st.success("🎯 이 데이터는 정상적으로 로드되었습니다!")
+                
                 return stock_lists
             else:
-                st.error("❌ 시장 데이터가 딕셔너리 형태가 아닙니다.")
+                st.error("❌ 일부 시장 데이터가 딕셔너리 형태가 아닙니다.")
         else:
             st.error(f"❌ 루트 데이터가 딕셔너리가 아닙니다: {type(stock_lists)}")
     
     except json.JSONDecodeError as e:
         st.error(f"❌ JSON 파싱 오류: {str(e)}")
+        st.error(f"오류 위치: line {e.lineno}, column {e.colno}")
     except UnicodeDecodeError as e:
         st.error(f"❌ 인코딩 오류: {str(e)}")
     except Exception as e:
         st.error(f"❌ 파일 로딩 실패: {str(e)}")
         st.error(f"오류 타입: {type(e).__name__}")
+        import traceback
+        st.error(f"상세 오류: {traceback.format_exc()}")
     
     # 실패 시 기본 데이터 사용
     st.warning("⚠️ 기본 샘플 종목 리스트를 사용합니다.")
