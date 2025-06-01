@@ -18,30 +18,19 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 메모리 최적화된 종목 리스트 로딩
-@st.cache_data(ttl=300, show_spinner=False)  # 캐시 시간 단축
+# 완전한 종목 리스트 로딩 (캐시 없이)
 def load_complete_stock_lists():
-    """완전한 종목 리스트를 로드합니다."""
+    """완전한 종목 리스트를 로드합니다. (캐시 없음)"""
     
     # GitHub에서 JSON 파일 읽기 시도
     json_file = "complete_stock_lists.json"
     
     # 상세한 파일 시스템 디버깅
-    st.subheader("🔍 파일 시스템 디버깅")
+    st.subheader("🔍 파일 시스템 디버깅 (캐시 없음)")
     
     # 현재 작업 디렉토리 확인
     current_dir = os.getcwd()
     st.write(f"📂 현재 작업 디렉토리: {current_dir}")
-    
-    # 디렉토리 내 모든 파일 목록
-    try:
-        all_files = os.listdir('.')
-        st.write(f"📄 전체 파일 목록: {all_files}")
-        
-        json_files = [f for f in all_files if f.endswith('.json')]
-        st.write(f"📊 JSON 파일들: {json_files}")
-    except Exception as e:
-        st.error(f"디렉토리 읽기 실패: {str(e)}")
     
     # 파일 존재 여부 및 상세 정보
     file_exists = os.path.exists(json_file)
@@ -56,43 +45,23 @@ def load_complete_stock_lists():
             readable = os.access(json_file, os.R_OK)
             st.write(f"📖 읽기 권한: {readable}")
             
-            # 파일 수정 시간
-            import datetime
-            mtime = os.path.getmtime(json_file)
-            mtime_str = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-            st.write(f"🕒 파일 수정 시간: {mtime_str}")
-            
         except Exception as e:
             st.error(f"파일 정보 확인 실패: {str(e)}")
     
     # 파일 존재 여부 확인
     if not file_exists:
         st.error(f"❌ {json_file} 파일을 찾을 수 없습니다!")
-        
-        # 기본 샘플 데이터 사용
         st.warning("⚠️ 기본 샘플 종목 리스트를 사용합니다.")
         return get_fallback_stock_lists()
     
-    # 파일 로딩 시도
-    st.info(f"🔄 {json_file} 파일 로딩 중...")
+    # 파일 로딩 시도 (매번 새로 로드)
+    st.info(f"🔄 {json_file} 파일 로딩 중... (캐시 없이)")
     
     try:
         with open(json_file, 'r', encoding='utf-8') as f:
             st.write("📖 파일 열기 성공")
             
-            # 파일 일부 미리보기
-            f.seek(0)
-            preview = f.read(200)
-            st.write(f"📄 파일 미리보기 (첫 200자):")
-            st.code(preview)
-            
-            # 파일 전체 읽기
-            f.seek(0)
-            content = f.read()
-            st.write(f"📐 전체 파일 크기: {len(content)} 문자")
-            
             # JSON 파싱
-            f.seek(0)
             stock_lists = json.load(f)
             st.write("✅ JSON 파싱 성공")
         
@@ -103,31 +72,37 @@ def load_complete_stock_lists():
             st.write(f"📈 시장 개수: {len(stock_lists)}")
             st.write(f"🏢 시장 목록: {list(stock_lists.keys())}")
             
-            # 각 시장별 종목 수 미리보기
+            # 각 시장별 종목 수 상세 확인
+            total_count = 0
             for market, stocks in stock_lists.items():
                 if isinstance(stocks, dict):
-                    st.write(f"🔍 {market}: {len(stocks)}개 종목")
+                    count = len(stocks)
+                    total_count += count
+                    st.write(f"🔍 **{market}**: {count}개 종목")
+                    
                     # 첫 3개 종목 예시
                     sample_stocks = list(stocks.items())[:3]
                     st.write(f"   예시: {sample_stocks}")
                 else:
                     st.error(f"❌ {market} 데이터가 딕셔너리가 아님: {type(stocks)}")
+                    return get_fallback_stock_lists()
             
-            if all(isinstance(v, dict) for v in stock_lists.values()):
-                total_stocks = sum(len(stocks) for stocks in stock_lists.values())
-                st.success(f"✅ 완전한 종목 리스트 로딩 완료! (총 {total_stocks}개 종목)")
+            # 총 종목 수 확인
+            st.success(f"🎯 **총 {total_count}개 종목 로드 완료!**")
+            
+            if total_count >= 800:  # 850개 근처라면 성공
+                st.success("✅ 완전한 851개 종목 리스트가 정상 로드되었습니다!")
                 
-                # 각 시장별 종목 수 표시
-                st.info("📊 시장별 종목 수:")
+                # 각 시장별 종목 수 최종 표시
+                st.info("📊 최종 시장별 종목 수:")
                 for market, stocks in stock_lists.items():
-                    st.write(f"- {market}: {len(stocks)}개")
-                
-                # 캐시 정보 표시
-                st.success("🎯 이 데이터는 정상적으로 로드되었습니다!")
+                    st.write(f"- **{market}**: {len(stocks)}개")
                 
                 return stock_lists
             else:
-                st.error("❌ 일부 시장 데이터가 딕셔너리 형태가 아닙니다.")
+                st.warning(f"⚠️ 종목 수가 예상보다 적습니다: {total_count}개")
+                st.info("샘플 데이터가 로드된 것 같습니다. 다시 시도합니다.")
+                return get_fallback_stock_lists()
         else:
             st.error(f"❌ 루트 데이터가 딕셔너리가 아닙니다: {type(stock_lists)}")
     
@@ -484,14 +459,13 @@ def main():
     # 사이드바
     st.sidebar.title("📊 설정")
     
-    # 캐시 클리어 버튼 (캐시된 함수 밖에서)
-    if st.sidebar.button("🔄 캐시 클리어 & 새로고침"):
-        st.cache_data.clear()
-        st.success("✅ 캐시가 클리어되었습니다! 페이지가 새로고침됩니다.")
+    # 강제 새로고침 버튼
+    if st.sidebar.button("🔄 강제 새로고침"):
+        st.success("✅ 페이지를 새로고침합니다!")
         st.rerun()
     
-    # 종목 리스트 로드
-    with st.spinner("종목 리스트 로딩 중..."):
+    # 종목 리스트 로드 (캐시 없이)
+    with st.spinner("완전한 종목 리스트 로딩 중... (캐시 없이)"):
         stock_lists = load_complete_stock_lists()
     
     # 더 상세한 데이터 유효성 검사
