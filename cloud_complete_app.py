@@ -23,11 +23,6 @@ st.set_page_config(
 def load_complete_stock_lists():
     """완전한 종목 리스트를 로드합니다."""
     
-    # 강제 캐시 클리어 체크
-    if st.sidebar.button("🔄 캐시 클리어 & 새로고침"):
-        st.cache_data.clear()
-        st.rerun()
-    
     # GitHub에서 JSON 파일 읽기 시도
     json_file = "complete_stock_lists.json"
     
@@ -488,6 +483,12 @@ def main():
     
     # 사이드바
     st.sidebar.title("📊 설정")
+    
+    # 캐시 클리어 버튼 (캐시된 함수 밖에서)
+    if st.sidebar.button("🔄 캐시 클리어 & 새로고침"):
+        st.cache_data.clear()
+        st.success("✅ 캐시가 클리어되었습니다! 페이지가 새로고침됩니다.")
+        st.rerun()
     
     # 종목 리스트 로드
     with st.spinner("종목 리스트 로딩 중..."):
