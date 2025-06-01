@@ -4,7 +4,14 @@ KOSPI, KOSDAQ, NASDAQ, S&P 500 등 다양한 주식 시장에서 특정 기술�
 
 ## ✨ 주요 기능
 
-### 🎯 기본 스크리너
+### 🎯 완전한 스크리너 (NEW!)
+- **851개 종목 지원**: S&P 500 (503개) + NASDAQ (154개) + KOSPI (110개) + KOSDAQ (84개)
+- **실시간 데이터**: yfinance 0.2.61 최신 버전으로 안정적인 데이터 연동
+- **BB(20,2) 돌파 + RSI 조건**: 요청하신 볼린저 밴드 상단 돌파와 RSI 조건 완벽 구현
+- **확장 가능한 조건 시스템**: AND/OR 조합으로 다양한 매매 전략 구현
+- **인터랙티브 차트**: Plotly 기반 캔들스틱 + 기술적 지표 차트
+
+### 🛠️ 기본 스크리너
 - **다양한 시장 지원**: KOSPI, KOSDAQ, NASDAQ, S&P 500
 - **사전 정의된 전략**: 모멘텀 돌파, 과매도 반전, 골든 크로스
 - **실시간 스크리닝**: 설정한 조건에 맞는 종목들을 실시간 필터링
@@ -34,6 +41,82 @@ KOSPI, KOSDAQ, NASDAQ, S&P 500 등 다양한 주식 시장에서 특정 기술�
 - **실시간 데이터**: Yahoo Finance API를 통한 최신 데이터
 
 ## 🚀 시작하기
+
+### 📋 사전 요구사항
+- Python 3.8+ 
+- 인터넷 연결 (실시간 주가 데이터 수집)
+
+### ⚡ 빠른 시작 (추천)
+
+#### 1️⃣ 자동 설치 및 실행 (macOS/Linux)
+```bash
+# 실행 권한 부여 (최초 1회만)
+chmod +x run_complete_screener.sh
+
+# 완전한 버전 실행 (851개 종목)
+./run_complete_screener.sh
+```
+
+#### 2️⃣ 빠른 실행 (macOS/Linux)
+```bash
+# 간단한 실행 (이미 설정된 환경)
+./start.sh
+```
+
+#### 3️⃣ Windows 사용자
+```cmd
+# 완전한 버전 실행
+run_complete_screener.bat
+```
+
+### 🔧 수동 설치
+
+#### 1. 저장소 클론
+```bash
+git clone https://github.com/blueblud7/stock_screener.git
+cd stock_screener
+```
+
+#### 2. 패키지 설치
+```bash
+pip install -r requirements.txt
+```
+
+#### 3. 종목 리스트 생성 (최초 1회)
+```bash
+python complete_stock_lists.py
+```
+
+#### 4. 애플리케이션 실행
+
+##### 🥇 완전한 버전 (851개 종목) - **추천**
+```bash
+streamlit run complete_app.py --server.port 8504
+```
+
+##### 🥈 실제 데이터 버전 (40개 종목)
+```bash
+streamlit run working_app.py --server.port 8503
+```
+
+##### 🥉 샘플 데이터 버전 (안정적)
+```bash
+streamlit run improved_app.py --server.port 8502
+```
+
+##### 📚 기본 버전
+```bash
+streamlit run app.py --server.port 8501
+```
+
+### 🌐 접속 주소
+
+| 버전 | 포트 | 접속 주소 | 특징 |
+|------|------|-----------|------|
+| **완전한 버전** | 8504 | http://localhost:8504 | 851개 종목, 모든 기능 |
+| 실제 데이터 | 8503 | http://localhost:8503 | 40개 주요 종목 |
+| 샘플 데이터 | 8502 | http://localhost:8502 | 안정적 데모 |
+| 기본 버전 | 8501 | http://localhost:8501 | 기본 기능 |
 
 ### 1. 환경 설정
 
