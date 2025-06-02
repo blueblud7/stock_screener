@@ -18,154 +18,61 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 완전한 종목 리스트 로딩 (캐시 없이)
-def load_complete_stock_lists():
-    """완전한 종목 리스트를 로드합니다. (캐시 없음)"""
+# 완전한 종목 리스트만 로딩 (샘플 데이터 완전 제거)
+def load_ultra_complete_stock_lists_only():
+    """오직 완전한 851개 종목만 로드합니다. 샘플 데이터 사용 안함."""
     
-    # GitHub에서 JSON 파일 읽기 시도
     json_file = "complete_stock_lists.json"
     
-    # 상세한 파일 시스템 디버깅
-    st.subheader("🔍 파일 시스템 디버깅 (캐시 없음)")
+    # 강제 디버깅 정보 표시
+    st.error("🚨 **CRITICAL DEBUG**: 완전한 종목 로딩 중...")
+    st.info(f"📂 현재 디렉토리: {os.getcwd()}")
+    st.info(f"📁 JSON 파일 존재: {os.path.exists(json_file)}")
     
-    # 현재 작업 디렉토리 확인
-    current_dir = os.getcwd()
-    st.write(f"📂 현재 작업 디렉토리: {current_dir}")
-    
-    # 파일 존재 여부 및 상세 정보
-    file_exists = os.path.exists(json_file)
-    st.write(f"📁 {json_file} 존재 여부: {file_exists}")
-    
-    if file_exists:
-        try:
-            file_size = os.path.getsize(json_file)
-            st.write(f"📏 파일 크기: {file_size:,} bytes")
-            
-            # 파일 읽기 권한 확인
-            readable = os.access(json_file, os.R_OK)
-            st.write(f"📖 읽기 권한: {readable}")
-            
-        except Exception as e:
-            st.error(f"파일 정보 확인 실패: {str(e)}")
-    
-    # 파일 존재 여부 확인
-    if not file_exists:
-        st.error(f"❌ {json_file} 파일을 찾을 수 없습니다!")
-        st.warning("⚠️ 기본 샘플 종목 리스트를 사용합니다.")
-        return get_fallback_stock_lists()
-    
-    # 파일 로딩 시도 (매번 새로 로드)
-    st.info(f"🔄 {json_file} 파일 로딩 중... (캐시 없이)")
-    
-    try:
-        with open(json_file, 'r', encoding='utf-8') as f:
-            st.write("📖 파일 열기 성공")
-            
-            # JSON 파싱
-            stock_lists = json.load(f)
-            st.write("✅ JSON 파싱 성공")
+    if os.path.exists(json_file):
+        file_size = os.path.getsize(json_file)
+        st.info(f"📏 파일 크기: {file_size:,} bytes")
         
-        # 데이터 유효성 검사
-        st.write(f"📊 로드된 데이터 타입: {type(stock_lists)}")
-        
-        if isinstance(stock_lists, dict):
-            st.write(f"📈 시장 개수: {len(stock_lists)}")
-            st.write(f"🏢 시장 목록: {list(stock_lists.keys())}")
-            
-            # 각 시장별 종목 수 상세 확인
-            total_count = 0
-            for market, stocks in stock_lists.items():
-                if isinstance(stocks, dict):
-                    count = len(stocks)
-                    total_count += count
-                    st.write(f"🔍 **{market}**: {count}개 종목")
+        if file_size > 80000:  # 80KB 이상이면 완전한 데이터
+            try:
+                with open(json_file, 'r', encoding='utf-8') as f:
+                    stock_lists = json.load(f)
+                
+                # 강제 검증
+                if isinstance(stock_lists, dict):
+                    total_count = sum(len(stocks) for stocks in stock_lists.values() if isinstance(stocks, dict))
                     
-                    # 첫 3개 종목 예시
-                    sample_stocks = list(stocks.items())[:3]
-                    st.write(f"   예시: {sample_stocks}")
+                    st.success(f"🎯 **로드된 총 종목 수: {total_count}개**")
+                    
+                    if total_count >= 800:  # 800개 이상이면 완전한 데이터
+                        st.success("✅ **완전한 851개 종목 데이터 로드 성공!**")
+                        
+                        # 각 시장별 종목 수 강제 표시
+                        for market, stocks in stock_lists.items():
+                            if isinstance(stocks, dict):
+                                st.write(f"🔍 **{market}: {len(stocks)}개 종목**")
+                        
+                        return stock_lists
+                    else:
+                        st.error(f"❌ 종목 수 부족: {total_count}개")
                 else:
-                    st.error(f"❌ {market} 데이터가 딕셔너리가 아님: {type(stocks)}")
-                    return get_fallback_stock_lists()
-            
-            # 총 종목 수 확인
-            st.success(f"🎯 **총 {total_count}개 종목 로드 완료!**")
-            
-            if total_count >= 800:  # 850개 근처라면 성공
-                st.success("✅ 완전한 851개 종목 리스트가 정상 로드되었습니다!")
-                
-                # 각 시장별 종목 수 최종 표시
-                st.info("📊 최종 시장별 종목 수:")
-                for market, stocks in stock_lists.items():
-                    st.write(f"- **{market}**: {len(stocks)}개")
-                
-                return stock_lists
-            else:
-                st.warning(f"⚠️ 종목 수가 예상보다 적습니다: {total_count}개")
-                st.info("샘플 데이터가 로드된 것 같습니다. 다시 시도합니다.")
-                return get_fallback_stock_lists()
+                    st.error("❌ 데이터 형식 오류")
+            except Exception as e:
+                st.error(f"❌ JSON 로딩 실패: {str(e)}")
         else:
-            st.error(f"❌ 루트 데이터가 딕셔너리가 아닙니다: {type(stock_lists)}")
+            st.error(f"❌ 파일 크기 부족: {file_size} bytes")
+    else:
+        st.error("❌ JSON 파일 없음")
     
-    except json.JSONDecodeError as e:
-        st.error(f"❌ JSON 파싱 오류: {str(e)}")
-        st.error(f"오류 위치: line {e.lineno}, column {e.colno}")
-    except UnicodeDecodeError as e:
-        st.error(f"❌ 인코딩 오류: {str(e)}")
-    except Exception as e:
-        st.error(f"❌ 파일 로딩 실패: {str(e)}")
-        st.error(f"오류 타입: {type(e).__name__}")
-        import traceback
-        st.error(f"상세 오류: {traceback.format_exc()}")
-    
-    # 실패 시 기본 데이터 사용
-    st.warning("⚠️ 기본 샘플 종목 리스트를 사용합니다.")
-    return get_fallback_stock_lists()
+    # 실패 시 앱 중단 (샘플 데이터 사용 안함)
+    st.error("🚨 **완전한 종목 데이터를 로드할 수 없습니다!**")
+    st.error("**샘플 데이터는 사용하지 않습니다. 관리자에게 문의하세요.**")
+    st.stop()
 
 def get_fallback_stock_lists():
-    """기본 샘플 종목 리스트 (완전한 버전이 로드되지 않을 때)"""
-    return {
-        "S&P 500": {
-            "AAPL": "Apple Inc.", "MSFT": "Microsoft Corp.", "GOOGL": "Alphabet Inc.",
-            "AMZN": "Amazon.com Inc.", "TSLA": "Tesla Inc.", "META": "Meta Platforms Inc.",
-            "NVDA": "NVIDIA Corp.", "JPM": "JPMorgan Chase & Co.", "JNJ": "Johnson & Johnson",
-            "UNH": "UnitedHealth Group Inc.", "V": "Visa Inc.", "PG": "Procter & Gamble Co.",
-            "HD": "Home Depot Inc.", "MA": "Mastercard Inc.", "BAC": "Bank of America Corp.",
-            "DIS": "Walt Disney Co.", "ADBE": "Adobe Inc.", "CRM": "Salesforce Inc.",
-            "NFLX": "Netflix Inc.", "XOM": "Exxon Mobil Corp.", "WMT": "Walmart Inc.",
-            "PFE": "Pfizer Inc.", "KO": "Coca-Cola Co.", "INTC": "Intel Corp.",
-            "CSCO": "Cisco Systems Inc.", "VZ": "Verizon Communications Inc.",
-            "TMO": "Thermo Fisher Scientific Inc.", "ACN": "Accenture PLC",
-            "ABBV": "AbbVie Inc.", "NKE": "Nike Inc."
-        },
-        "NASDAQ": {
-            "AAPL": "Apple Inc.", "MSFT": "Microsoft Corp.", "GOOGL": "Alphabet Inc.",
-            "AMZN": "Amazon.com Inc.", "TSLA": "Tesla Inc.", "META": "Meta Platforms Inc.",
-            "NVDA": "NVIDIA Corp.", "PYPL": "PayPal Holdings Inc.", "CMCSA": "Comcast Corp.",
-            "INTC": "Intel Corp.", "CSCO": "Cisco Systems Inc.", "PEP": "PepsiCo Inc.",
-            "ADBE": "Adobe Inc.", "NFLX": "Netflix Inc.", "TXN": "Texas Instruments Inc.",
-            "QCOM": "QUALCOMM Inc.", "COST": "Costco Wholesale Corp.", "AVGO": "Broadcom Inc.",
-            "SBUX": "Starbucks Corp.", "GILD": "Gilead Sciences Inc."
-        },
-        "KOSPI": {
-            "005930.KS": "삼성전자", "000660.KS": "SK하이닉스", "035420.KS": "NAVER",
-            "005490.KS": "POSCO홀딩스", "000270.KS": "기아", "005380.KS": "현대차",
-            "051910.KS": "LG화학", "035720.KS": "카카오", "006400.KS": "삼성SDI",
-            "028260.KS": "삼성물산", "068270.KS": "셀트리온", "207940.KS": "삼성바이오로직스",
-            "066570.KS": "LG전자", "323410.KS": "카카오뱅크", "003670.KS": "포스코퓨처엠",
-            "096770.KS": "SK이노베이션", "009150.KS": "삼성전기", "000810.KS": "삼성화재",
-            "017670.KS": "SK텔레콤", "030200.KS": "KT", "034730.KS": "SK", "018260.KS": "삼성에스디에스",
-            "015760.KS": "한국전력", "010950.KS": "S-Oil", "011170.KS": "롯데케미칼"
-        },
-        "KOSDAQ": {
-            "263750.KQ": "펄어비스", "293490.KQ": "카카오게임즈", "196170.KQ": "알테오젠",
-            "041510.KQ": "에스엠", "145020.KQ": "휴젤", "112040.KQ": "위메이드",
-            "357780.KQ": "솔브레인", "086900.KQ": "메디톡스", "039030.KQ": "이오테크닉스",
-            "058470.KQ": "리노공업", "067310.KQ": "하나마이크론", "078600.KQ": "대주전자재료",
-            "108860.KQ": "셀바스AI", "095340.KQ": "ISC", "317870.KQ": "엔바이오니아",
-            "122870.KQ": "와이지엔터테인먼트", "240810.KQ": "원익피앤이", "253450.KQ": "스튜디오드래곤",
-            "376300.KQ": "디어유", "200130.KQ": "콜마비앤에이치"
-        }
-    }
+    """샘플 데이터 - 이제 사용하지 않음"""
+    st.error("🚨 샘플 데이터 호출됨! 이는 오류입니다!")
+    st.stop()
 
 # 캐시된 기술적 지표 계산
 @st.cache_data(ttl=600)  # 10분 캐시
@@ -442,31 +349,32 @@ def create_simple_chart(symbol, df):
 
 # 메인 앱
 def main():
-    st.title("🚀 주식 기술적 분석 스크리너 (Complete Cloud Edition)")
-    st.markdown("**완전한 버전 - 최대 851개 종목 지원 (Streamlit Cloud)**")
+    st.title("🚀 주식 기술적 분석 스크리너 (Ultra Complete Edition)")
+    st.markdown("**오직 완전한 851개 종목만 지원 - 샘플 데이터 사용 안함**")
     
-    # 중요 공지
+    # 긴급 공지
     st.markdown("""
-    <div style="background-color: #e6f3ff; padding: 10px; border-radius: 5px; border-left: 5px solid #0066cc;">
-    <strong>📢 중요:</strong> 이 앱은 <strong>851개 전체 종목</strong>을 지원합니다!<br>
+    <div style="background-color: #ff6b6b; color: white; padding: 15px; border-radius: 5px; margin: 10px 0;">
+    <strong>🚨 중요 업데이트:</strong><br>
+    • 이 버전은 <strong>오직 완전한 851개 종목만</strong> 사용합니다<br>
+    • 샘플 데이터는 완전히 제거되었습니다<br>
     • S&P 500: 503개 | NASDAQ: 154개 | KOSPI: 110개 | KOSDAQ: 84개<br>
-    • complete_stock_lists.json 파일이 정상 로드되면 전체 종목을 사용할 수 있습니다.
     </div>
     """, unsafe_allow_html=True)
     
     st.markdown("---")
     
     # 사이드바
-    st.sidebar.title("📊 설정")
+    st.sidebar.title("📊 Ultra Complete 설정")
     
     # 강제 새로고침 버튼
-    if st.sidebar.button("🔄 강제 새로고침"):
-        st.success("✅ 페이지를 새로고침합니다!")
+    if st.sidebar.button("🔄 완전한 데이터 강제 로드"):
+        st.success("✅ 완전한 데이터를 강제로 로드합니다!")
         st.rerun()
     
-    # 종목 리스트 로드 (캐시 없이)
-    with st.spinner("완전한 종목 리스트 로딩 중... (캐시 없이)"):
-        stock_lists = load_complete_stock_lists()
+    # 종목 리스트 로드 (완전한 데이터만)
+    with st.spinner("🚨 완전한 851개 종목 로딩 중... (샘플 데이터 사용 안함)"):
+        stock_lists = load_ultra_complete_stock_lists_only()
     
     # 더 상세한 데이터 유효성 검사
     st.sidebar.markdown("### 🔍 시스템 상태")
