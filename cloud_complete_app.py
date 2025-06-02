@@ -18,9 +18,9 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# 완전한 종목 리스트만 로딩 (샘플 데이터 완전 제거)
+# 완전한 종목 리스트만 로딩 (실제 JSON 구조에 맞게)
 def load_ultra_complete_stock_lists_only():
-    """오직 완전한 851개 종목만 로드합니다. 샘플 데이터 사용 안함."""
+    """오직 완전한 851개 종목만 로드합니다. 실제 JSON 구조 지원."""
     
     json_file = "complete_stock_lists.json"
     
@@ -36,21 +36,49 @@ def load_ultra_complete_stock_lists_only():
         if file_size > 80000:  # 80KB 이상이면 완전한 데이터
             try:
                 with open(json_file, 'r', encoding='utf-8') as f:
-                    stock_lists = json.load(f)
+                    stock_data = json.load(f)
                 
-                # 강제 검증
-                if isinstance(stock_lists, dict):
-                    total_count = sum(len(stocks) for stocks in stock_lists.values() if isinstance(stocks, dict))
+                st.success("✅ JSON 파싱 성공")
+                st.write(f"📊 로드된 데이터 타입: {type(stock_data)}")
+                
+                # 실제 JSON 구조에 맞게 변환
+                if isinstance(stock_data, dict):
+                    stock_lists = {}
+                    total_count = 0
                     
-                    st.success(f"🎯 **로드된 총 종목 수: {total_count}개**")
+                    for market, stocks in stock_data.items():
+                        if isinstance(stocks, list):  # 배열 구조
+                            st.write(f"🔍 {market}: {len(stocks)}개 종목 (배열 형태)")
+                            
+                            # 배열을 딕셔너리로 변환
+                            market_dict = {}
+                            for stock in stocks:
+                                if isinstance(stock, dict) and 'symbol' in stock and 'name' in stock:
+                                    market_dict[stock['symbol']] = stock['name']
+                            
+                            stock_lists[market] = market_dict
+                            total_count += len(market_dict)
+                            
+                            # 첫 3개 종목 예시
+                            sample_items = list(market_dict.items())[:3]
+                            st.write(f"   예시: {sample_items}")
+                            
+                        elif isinstance(stocks, dict):  # 기존 딕셔너리 구조
+                            st.write(f"🔍 {market}: {len(stocks)}개 종목 (딕셔너리 형태)")
+                            stock_lists[market] = stocks
+                            total_count += len(stocks)
+                        else:
+                            st.error(f"❌ {market} 데이터 형식 오류: {type(stocks)}")
+                            continue
+                    
+                    st.success(f"🎯 **변환된 총 종목 수: {total_count}개**")
                     
                     if total_count >= 800:  # 800개 이상이면 완전한 데이터
                         st.success("✅ **완전한 851개 종목 데이터 로드 성공!**")
                         
-                        # 각 시장별 종목 수 강제 표시
+                        # 각 시장별 종목 수 최종 표시
                         for market, stocks in stock_lists.items():
-                            if isinstance(stocks, dict):
-                                st.write(f"🔍 **{market}: {len(stocks)}개 종목**")
+                            st.write(f"🔍 **{market}: {len(stocks)}개 종목**")
                         
                         return stock_lists
                     else:
@@ -59,6 +87,8 @@ def load_ultra_complete_stock_lists_only():
                     st.error("❌ 데이터 형식 오류")
             except Exception as e:
                 st.error(f"❌ JSON 로딩 실패: {str(e)}")
+                import traceback
+                st.error(f"상세 오류: {traceback.format_exc()}")
         else:
             st.error(f"❌ 파일 크기 부족: {file_size} bytes")
     else:
